@@ -2,7 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 from .utils import get_class_name
 
-def print_plot(image, predictions, title, confidence_threshold=0.90):
+def print_plot(image, predictions, title, confidence_threshold=0.20):
     if isinstance(image, torch.Tensor):
         image_np = image.detach().permute(1,2,0).cpu().numpy()
     else:
@@ -28,7 +28,7 @@ def print_plot(image, predictions, title, confidence_threshold=0.90):
     plt.tight_layout()
     plt.show()
 
-def compare_detections(original_image, adversarial_image, detector, threshold=0.90):
+def compare_detections(original_image, adversarial_image, detector, threshold=0.20):
     original_predictions = detector.detect_objects(original_image)
     adversarial_predictions = detector.detect_objects(adversarial_image)    
 

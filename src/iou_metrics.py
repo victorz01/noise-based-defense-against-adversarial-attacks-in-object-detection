@@ -82,10 +82,11 @@ def calculate_ciou(box1, box2, iou):
     return ciou
 
 def compare_detections_iou(predictions1, predictions2, 
-                          confidence_threshold=0.5, 
-                          iou_threshold=0.5,
+                          confidence_threshold,
                           iou_type="standard"):
-
+    '''
+    Compares two sets of object detection predictions using one type of IoU.
+    '''
     boxes1 = predictions1['boxes'][predictions1['scores'] > confidence_threshold]
     labels1 = predictions1['labels'][predictions1['scores'] > confidence_threshold]
     scores1 = predictions1['scores'][predictions1['scores'] > confidence_threshold]
@@ -102,6 +103,9 @@ def compare_detections_iou(predictions1, predictions2,
     
     matches = []
     matched_indices_2 = set()
+    all_iou_values = [] 
+    matched_iou_values = [] 
+    
     for i, (box1, label1, score1) in enumerate(zip(boxes1, labels1, scores1)):
         best_iou = 0
         best_match = None
@@ -111,7 +115,9 @@ def compare_detections_iou(predictions1, predictions2,
                 continue
             if label1 == label2:
                 iou = calculate_iou(box1, box2, iou_type)
-                if iou > best_iou and iou > iou_threshold:
+                all_iou_values.append(iou)  
+                
+                if iou > best_iou:
                     best_iou = iou
                     best_match = j
         
@@ -124,34 +130,36 @@ def compare_detections_iou(predictions1, predictions2,
                 'score1': score1,
                 'score2': scores2[best_match]
             })
+            matched_iou_values.append(best_iou) 
             matched_indices_2.add(best_match)
     
-
     num_detections_1 = len(boxes1)
     num_detections_2 = len(boxes2)
     num_matches = len(matches)
     
     precision = num_matches / num_detections_1 if num_detections_1 > 0 else 0
-    recall = num_matches / num_detections_2 if num_detections_2 > 0 else 0
-    f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-    
-    avg_iou = sum([match['iou'] for match in matches]) / len(matches) if matches else 0
-    
+
+    avg_iou = sum([match['iou'] for match in matches]) / (max(num_detections_1, num_detections_2)) if matches else 0
+
     return {
         'matches': matches,
         'num_detections_1': num_detections_1,
         'num_detections_2': num_detections_2,
         'num_matches': num_matches,
         'precision': precision,
-        'recall': recall,
-        'f1_score': f1_score,
         'average_iou': avg_iou,
-        'iou_type': iou_type
+        'iou_type': iou_type,
+        'matched_iou_values': matched_iou_values, 
+        'all_iou_values': all_iou_values  
     }
 
 def test_noise_defense_with_iou(detector, image_path, target_class, 
-                               noise_configs, num_iterations=3):
+                               noise_configs, num_iterations=3,iou_type="standard",confidence_threshold=0.2):
+    '''
+    Tests the effectiveness of noise as a defense against adversarial patches
+    Iterative tests different types of noise 
 
+    '''
     original_image, adversarial_image, _ = detector.generate_adversarial_patch(
         image_path=image_path,
         target_class=target_class,
@@ -162,10 +170,6 @@ def test_noise_defense_with_iou(detector, image_path, target_class,
     baseline_adversarial = detector.detect_objects(adversarial_image)
     
     results = {
-        'baseline': {
-            'clean_detections': len(baseline_clean['scores'][baseline_clean['scores'] > 0.5]),
-            'adversarial_detections': len(baseline_adversarial['scores'][baseline_adversarial['scores'] > 0.5])
-        },
         'noise_tests': []
     }
 
@@ -180,26 +184,18 @@ def test_noise_defense_with_iou(detector, image_path, target_class,
 
         clean_comparison = compare_detections_iou(
             baseline_clean, noisy_clean_pred,
-            confidence_threshold=0.5, iou_type="standard"
+            confidence_threshold=confidence_threshold, iou_type=iou_type
         )
         
         adversarial_comparison = compare_detections_iou(
             baseline_adversarial, noisy_adversarial_pred,
-            confidence_threshold=0.5, iou_type="standard"
+            confidence_threshold=confidence_threshold, iou_type=iou_type
         )
         
         results['noise_tests'].append({
             'noise_config': noise_config,
             'clean_comparison': clean_comparison,
             'adversarial_comparison': adversarial_comparison,
-            'defense_effectiveness': {
-                'clean_iou_drop': 1 - clean_comparison['average_iou'],
-                'adversarial_iou_drop': 1 - adversarial_comparison['average_iou'],
-                'detection_reduction': (
-                    len(baseline_adversarial['scores'][baseline_adversarial['scores'] > 0.5]) - 
-                    len(noisy_adversarial_pred['scores'][noisy_adversarial_pred['scores'] > 0.5])
-                )
-            }
         })
     
     return results
