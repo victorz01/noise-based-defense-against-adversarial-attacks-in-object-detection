@@ -108,8 +108,6 @@ class AdversarialObjectDetection:
             loss_value = float(loss.detach().cpu())
             loss_history.append(loss_value)
 
-            if i % 20 == 0:
-                print(f"Iteration {i}: Loss = {loss_value:.4f}")
         with torch.no_grad():
             adversarial_image = self.apply_patch(original_image)
         return original_image, adversarial_image, loss_history
