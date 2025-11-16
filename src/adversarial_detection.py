@@ -5,6 +5,9 @@ import torch.optim as optim
 from torchvision.transforms import transforms 
 from torchvision.models import detection 
 from typing import Tuple
+from torchvision.models.detection import retinanet_resnet50_fpn
+from torchvision.models import get_model
+from torchvision.models.detection import FasterRCNN
 from PIL import Image
 
 class AdversarialObjectDetection: 
@@ -25,8 +28,10 @@ class AdversarialObjectDetection:
         self._load_model()
 
     def _load_model(self):
-        if self.name == "fasterrcnn":
-            self.model = detection.fasterrcnn_resnet50_fpn(pretrained=True).to(self.device)
+        if self.name == "fasterrcnn" or self.name == "fasterrcnn_resnet50":
+            self.model = detection.fasterrcnn_resnet50_fpn(pretrained=True)
+        elif self.name == "fasterrcnn_mobilenet":
+            self.model = detection.fasterrcnn_mobilenet_v3_large_fpn(pretrained=True)
         else:
             raise ValueError(f"Model {self.name} no found")
         self.model.to(self.device)
@@ -107,7 +112,7 @@ class AdversarialObjectDetection:
 
             loss_value = float(loss.detach().cpu())
             loss_history.append(loss_value)
-
+            print(f"Iteration {i+1}: Loss = {loss_value:.3f}")
         with torch.no_grad():
             adversarial_image = self.apply_patch(original_image)
         return original_image, adversarial_image, loss_history
