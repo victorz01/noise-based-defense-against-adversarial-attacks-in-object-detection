@@ -36,6 +36,8 @@ class AdversarialObjectDetection:
             raise ValueError(f"Model {self.name} no found")
         self.model.to(self.device)
         self.model.eval()
+        for param in self.model.parameters():
+            param.requires_grad = False
         print("Loading model")
 
     def load_image(self,image_path,target_size: Tuple[int,int] = (640,640)):
