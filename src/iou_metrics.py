@@ -77,7 +77,10 @@ def calculate_ciou(box1, box2, iou):
     
     v = (4 / (math.pi ** 2)) * ((math.atan(w1/h1) - math.atan(w2/h2)) ** 2)
     alpha = v / (1 - iou + v) if (1 - iou + v) != 0 else 0
-    
+    if iou <= 0:
+        alpha = 0
+    else:
+        alpha = v / (1 - iou + v) if (1 - iou + v) != 0 else 0
     ciou = diou - alpha * v
     return ciou
 
@@ -137,7 +140,7 @@ def compare_detections_iou(predictions1, predictions2,
     num_detections_2 = len(boxes2)
     num_matches = len(matches)
     
-    precision = num_matches / num_detections_1 if num_detections_1 > 0 else 0
+    precision = num_matches / num_detections_2 if num_detections_2 > 0 else 0
 
     avg_iou = sum([match['iou'] for match in matches]) / (max(num_detections_1, num_detections_2)) if matches else 0
 
