@@ -4,6 +4,7 @@ from .utils import get_class_name
 import math
 from .utils import get_class_name
 from .noise_functions import add_noise
+import numpy as np
 
 def calculate_iou(box1, box2, iou_type="standard"):
     x1 = max(box1[0], box2[0])
@@ -103,6 +104,9 @@ def compare_detections_iou(predictions1, predictions2,
     labels2 = labels2.detach().cpu().numpy()
     scores1 = scores1.detach().cpu().numpy()
     scores2 = scores2.detach().cpu().numpy()
+
+    sort_idx1 = np.argsort(-scores1) # descending
+    boxes1, labels1, scores1 = boxes1[sort_idx1], labels1[sort_idx1], scores1[sort_idx1]
     
     matches = []
     matched_indices_2 = set()
@@ -110,7 +114,7 @@ def compare_detections_iou(predictions1, predictions2,
     matched_iou_values = [] 
     
     for i, (box1, label1, score1) in enumerate(zip(boxes1, labels1, scores1)):
-        best_iou = 0
+        best_iou = -float('inf')
         best_match = None
         
         for j, (box2, label2, score2) in enumerate(zip(boxes2, labels2, scores2)):
@@ -124,7 +128,7 @@ def compare_detections_iou(predictions1, predictions2,
                     best_iou = iou
                     best_match = j
         
-        if best_match is not None:
+        if best_match is not None and best_iou > -1.0:
             matches.append({
                 'box1_idx': i,
                 'box2_idx': best_match,
