@@ -77,7 +77,6 @@ def calculate_ciou(box1, box2, iou):
         return diou
     
     v = (4 / (math.pi ** 2)) * ((math.atan(w1/h1) - math.atan(w2/h2)) ** 2)
-    alpha = v / (1 - iou + v) if (1 - iou + v) != 0 else 0
     if iou <= 0:
         alpha = 0
     else:
@@ -128,7 +127,7 @@ def compare_detections_iou(predictions1, predictions2,
                     best_iou = iou
                     best_match = j
         
-        if best_match is not None and best_iou > -1.0:
+        if best_match is not None and best_iou > 0.0:
             matches.append({
                 'box1_idx': i,
                 'box2_idx': best_match,
@@ -160,49 +159,98 @@ def compare_detections_iou(predictions1, predictions2,
         'all_iou_values': all_iou_values  
     }
 
-def test_noise_defense_with_iou(detector, image_path, target_class, 
-                               noise_configs, num_iterations=3,iou_type="standard",confidence_threshold=0.2):
-    '''
-    Tests the effectiveness of noise as a defense against adversarial patches
-    Iterative tests different types of noise 
-
-    '''
+def test_noise_defense_with_iou(
+    detector,
+    image_path,
+    target_class,
+    noise_configs,
+    num_iterations=3,
+    iou_type="standard",
+    confidence_threshold=0.5,
+    denoiser=None,
+    pipelines=None,
+):
+    
     original_image, adversarial_image, _ = detector.generate_adversarial_patch(
         image_path=image_path,
         target_class=target_class,
-        num_iterations=num_iterations
+        num_iterations=num_iterations,
     )
 
     baseline_clean = detector.detect_objects(original_image)
     baseline_adversarial = detector.detect_objects(adversarial_image)
+
+    if pipelines is None:
+        pipelines = ["noise_only"] if denoiser is None else ["noise_only", "denoise_only", "noise_then_denoise"]
     
-    results = {
-        'noise_tests': []
-    }
-
-    for noise_config in noise_configs:
-        noise_type = noise_config['type']
-        noise_params = {k: v for k, v in noise_config.items() if k != 'type'}
-        noisy_original = add_noise(noise_type, original_image.clone(), **noise_params)
-        noisy_adversarial = add_noise(noise_type, adversarial_image.clone(), **noise_params)
-
-        noisy_clean_pred = detector.detect_objects(noisy_original)
-        noisy_adversarial_pred = detector.detect_objects(noisy_adversarial)
-
-        clean_comparison = compare_detections_iou(
-            baseline_clean, noisy_clean_pred,
-            confidence_threshold=confidence_threshold, iou_type=iou_type
-        )
-        
-        adversarial_comparison = compare_detections_iou(
-            baseline_adversarial, noisy_adversarial_pred,
-            confidence_threshold=confidence_threshold, iou_type=iou_type
-        )
-        
-        results['noise_tests'].append({
-            'noise_config': noise_config,
-            'clean_comparison': clean_comparison,
-            'adversarial_comparison': adversarial_comparison,
-        })
+    def _apply_noise(img,config):
+        noise_type = config.get("type")
+        params = {k: v for k, v in config.items() if k!= "type"}
+        return add_noise(noise_type,img,**params)
     
+    def _denoise(img):
+        if denoiser is None:
+            raise ValueError("denoiser is None but asked for denoiser")
+        denoiser.eval()
+
+        with torch.no_grad():
+            x = img.unsqueeze(0) if img.dim() == 3 else img 
+            try:
+                model_device = next(denoiser.parameters()).device
+            except StopIteration:
+                model_device = torch.device('cpu')
+            
+            y = denoiser(x.to(model_device))
+            y =y.to(img.device)
+
+            if img.dim() == 3:
+                y = y.squeeze(0)
+            
+            return y.clamp(0,1)
+    
+
+    results = {"noise_tests":[]}
+
+    has_run_denoise_only = False
+
+    for cfg in noise_configs:
+        for pipeline in pipelines:
+            if pipeline == "denoise_only":
+                if has_run_denoise_only:
+                    continue  # Only run denoise_only once per setup
+                has_run_denoise_only = True
+                
+            if pipeline == "noise_only":
+                test_clean_img = _apply_noise(original_image, cfg)
+                test_adv_img = _apply_noise(adversarial_image, cfg)
+            
+            elif pipeline == "denoise_only":
+                test_clean_img = _denoise(original_image)
+                test_adv_img = _denoise(adversarial_image)
+            
+            elif pipeline == "noise_then_denoise":
+                noisy_clean = _apply_noise(original_image, cfg)
+                noisy_adv = _apply_noise(adversarial_image, cfg)
+                test_clean_img = _denoise(noisy_clean)
+                test_adv_img = _denoise(noisy_adv)
+            
+            else:
+                raise ValueError(f"Unknown pipeline: {pipeline}")
+            
+            test_clean_pred = detector.detect_objects(test_clean_img)
+            test_adv_pred = detector.detect_objects(test_adv_img)
+
+            clean_comp = compare_detections_iou(baseline_clean, test_clean_pred, confidence_threshold, iou_type)
+            adv_comp = compare_detections_iou(baseline_adversarial, test_adv_pred, confidence_threshold, iou_type)
+            adv_recovery_comp = compare_detections_iou(baseline_clean, test_adv_pred, confidence_threshold, iou_type)
+
+            out_cfg = dict(cfg)
+            out_cfg["pipeline"] = pipeline
+
+            results["noise_tests"].append({
+                "noise_config": out_cfg,
+                "clean_comparison": clean_comp,
+                "adversarial_comparison": adv_comp,
+                "adv_recovery_comparison": adv_recovery_comp
+            })
     return results

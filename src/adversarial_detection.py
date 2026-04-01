@@ -114,7 +114,7 @@ class AdversarialObjectDetection:
 
             loss_value = float(loss.detach().cpu())
             loss_history.append(loss_value)
-            print(f"Iteration {i+1}: Loss = {loss_value:.3f}")
+            #print(f"Iteration {i+1}: Loss = {loss_value:.3f}")
         with torch.no_grad():
             adversarial_image = self.apply_patch(original_image)
         return original_image, adversarial_image, loss_history
