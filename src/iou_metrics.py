@@ -165,20 +165,26 @@ def test_noise_defense_with_iou(
     target_class,
     noise_configs,
     num_iterations=3,
-    iou_type="standard",
+    iou_types=["standard"],
     confidence_threshold=0.5,
     denoiser=None,
     pipelines=None,
+    precomputed_data=None,
 ):
-    
-    original_image, adversarial_image, _ = detector.generate_adversarial_patch(
-        image_path=image_path,
-        target_class=target_class,
-        num_iterations=num_iterations,
-    )
+    if precomputed_data is not None:
+        original_image = precomputed_data['original_image']
+        adversarial_image = precomputed_data['adversarial_image']
+        baseline_clean = precomputed_data['baseline_clean']
+        baseline_adversarial = precomputed_data['baseline_adversarial']
+    else:
+        original_image, adversarial_image, _ = detector.generate_adversarial_patch(
+            image_path=image_path,
+            target_class=target_class,
+            num_iterations=num_iterations,
+        )
 
-    baseline_clean = detector.detect_objects(original_image)
-    baseline_adversarial = detector.detect_objects(adversarial_image)
+        baseline_clean = detector.detect_objects(original_image)
+        baseline_adversarial = detector.detect_objects(adversarial_image)
 
     if pipelines is None:
         pipelines = ["noise_only"] if denoiser is None else ["noise_only", "denoise_only", "noise_then_denoise"]
@@ -209,7 +215,10 @@ def test_noise_defense_with_iou(
             return y.clamp(0,1)
     
 
-    results = {"noise_tests":[]}
+    if isinstance(iou_types, str):
+        iou_types = [iou_types]
+
+    results_by_iou = {iou_type: {"noise_tests": []} for iou_type in iou_types}
 
     has_run_denoise_only = False
 
@@ -217,7 +226,7 @@ def test_noise_defense_with_iou(
         for pipeline in pipelines:
             if pipeline == "denoise_only":
                 if has_run_denoise_only:
-                    continue  # Only run denoise_only once per setup
+                    continue
                 has_run_denoise_only = True
                 
             if pipeline == "noise_only":
@@ -237,20 +246,24 @@ def test_noise_defense_with_iou(
             else:
                 raise ValueError(f"Unknown pipeline: {pipeline}")
             
+            # This is the heavy operation - now only done ONCE per configuration.
             test_clean_pred = detector.detect_objects(test_clean_img)
             test_adv_pred = detector.detect_objects(test_adv_img)
 
-            clean_comp = compare_detections_iou(baseline_clean, test_clean_pred, confidence_threshold, iou_type)
-            adv_comp = compare_detections_iou(baseline_adversarial, test_adv_pred, confidence_threshold, iou_type)
-            adv_recovery_comp = compare_detections_iou(baseline_clean, test_adv_pred, confidence_threshold, iou_type)
-
+            # Apply all IoU calculations retroactively to the same predictions
             out_cfg = dict(cfg)
             out_cfg["pipeline"] = pipeline
 
-            results["noise_tests"].append({
-                "noise_config": out_cfg,
-                "clean_comparison": clean_comp,
-                "adversarial_comparison": adv_comp,
-                "adv_recovery_comparison": adv_recovery_comp
-            })
-    return results
+            for iou_type in iou_types:
+                clean_comp = compare_detections_iou(baseline_clean, test_clean_pred, confidence_threshold, iou_type)
+                adv_comp = compare_detections_iou(baseline_adversarial, test_adv_pred, confidence_threshold, iou_type)
+                adv_recovery_comp = compare_detections_iou(baseline_clean, test_adv_pred, confidence_threshold, iou_type)
+
+                results_by_iou[iou_type]["noise_tests"].append({
+                    "noise_config": out_cfg,
+                    "clean_comparison": clean_comp,
+                    "adversarial_comparison": adv_comp,
+                    "adv_recovery_comparison": adv_recovery_comp
+                })
+
+    return results_by_iou

@@ -1,2 +1,6 @@
 /leftImg8bit
 /env
+/.venv/
+license.txt
+README
+/src/__pycache__
