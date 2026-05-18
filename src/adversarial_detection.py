@@ -11,6 +11,8 @@ from torchvision.models.detection import FasterRCNN
 from PIL import Image
 
 class AdversarialObjectDetection: 
+
+    #Loading fasterrcnn with resnet50
     def __init__(self,name:str="fasterrcnn",device=None):
         self.name = name
         self.model = None
@@ -66,6 +68,7 @@ class AdversarialObjectDetection:
             outputs = self.model(image)
         return outputs[0]
     
+    #Compute the loss for attacks, maximize the loss
     def compute_targeted_loss(self,
                               class_logits,
                               target_class: int):
@@ -89,7 +92,7 @@ class AdversarialObjectDetection:
 
         return loss
     
-
+    #Generate adversarial patch and return the original image, adversarial image and the loss history during training
     def generate_adversarial_patch(self,
                                image_path,
                                target_class,
