@@ -37,6 +37,7 @@ The goal is to measure how robust detection is under these conditions using IoU-
 
 ## Dataset
 
+The dataset is of the cityscapes dataset of leftImg8bit set
 This project expects Cityscapes-style image folders in:
 
 - `leftImg8bit/train`
