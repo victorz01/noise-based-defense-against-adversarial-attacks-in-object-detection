@@ -2,6 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 from .utils import get_class_name
 
+#Visualization fucntions to compare the original and adversairal images and their detections 
 def print_plot(image, predictions, title, confidence_threshold=0.20):
     if isinstance(image, torch.Tensor):
         image_np = image.detach().permute(1,2,0).cpu().numpy()

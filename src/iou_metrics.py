@@ -6,6 +6,9 @@ from .utils import get_class_name
 from .noise_functions import add_noise
 import numpy as np
 
+#IoU calculation function fo different types of iou metrics - standard, giou, diou and ciou
+
+
 def calculate_iou(box1, box2, iou_type="standard"):
     x1 = max(box1[0], box2[0])
     y1 = max(box1[1], box2[1])
@@ -84,12 +87,12 @@ def calculate_ciou(box1, box2, iou):
     ciou = diou - alpha * v
     return ciou
 
+#Compare two setes of detections and return the Iou Metrics for each one 
 def compare_detections_iou(predictions1, predictions2, 
                           confidence_threshold,
                           iou_type="standard"):
-    '''
-    Compares two sets of object detection predictions using one type of IoU.
-    '''
+    
+    #Remove the detections below the threshold 
     boxes1 = predictions1['boxes'][predictions1['scores'] > confidence_threshold]
     labels1 = predictions1['labels'][predictions1['scores'] > confidence_threshold]
     scores1 = predictions1['scores'][predictions1['scores'] > confidence_threshold]
@@ -104,6 +107,7 @@ def compare_detections_iou(predictions1, predictions2,
     scores1 = scores1.detach().cpu().numpy()
     scores2 = scores2.detach().cpu().numpy()
 
+    #Sort the detection by confidence level to ensure that the best matches are found first
     sort_idx1 = np.argsort(-scores1) # descending
     boxes1, labels1, scores1 = boxes1[sort_idx1], labels1[sort_idx1], scores1[sort_idx1]
     
@@ -117,6 +121,7 @@ def compare_detections_iou(predictions1, predictions2,
         best_match = None
         
         for j, (box2, label2, score2) in enumerate(zip(boxes2, labels2, scores2)):
+            #Make sure that we dont use the same box twice for matching and that lavels are the same 
             if j in matched_indices_2:
                 continue
             if label1 == label2:
@@ -139,12 +144,14 @@ def compare_detections_iou(predictions1, predictions2,
             matched_iou_values.append(best_iou) 
             matched_indices_2.add(best_match)
     
+    
     num_detections_1 = len(boxes1)
     num_detections_2 = len(boxes2)
     num_matches = len(matches)
     
     precision = num_matches / num_detections_2 if num_detections_2 > 0 else 0
 
+    #Calculate average IoU based on the number of detections in the larger set of images 
     avg_iou = sum([match['iou'] for match in matches]) / (max(num_detections_1, num_detections_2)) if matches else 0
 
     return {
@@ -159,6 +166,8 @@ def compare_detections_iou(predictions1, predictions2,
         'all_iou_values': all_iou_values  
     }
 
+#Main fucntion to test the noise methods with the iou metrics 
+#Includes making the adversarial patch, applying noise and denoising pipelines and then calculting the iou metrics 
 def test_noise_defense_with_iou(
     detector,
     image_path,

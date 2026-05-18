@@ -6,6 +6,7 @@ from .hgd_trainer import HGDTrainer
 from .adversarial_detection import AdversarialObjectDetection
 import random
 
+#Dataset class to create patches form the clean and adversairal images 
 class PatchDataset(Dataset):
     def __init__(self, data_list, patch_size=256):
         self.data_list = data_list
@@ -28,6 +29,7 @@ class PatchDataset(Dataset):
         
         return clean_crop, adv_crop
 
+#Main function to train the denoiser with the adversarial examples
 def train_denoiser(image_paths, target_class=1, epochs=10,
                    noise_std=15,
                    p_identity=0.34,
