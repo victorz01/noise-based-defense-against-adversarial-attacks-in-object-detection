@@ -4,8 +4,9 @@
 This project studies how object detection changes when images are:
 
 1. attacked with an adversarial patch,
-2. corrupted with different noise types,
+2. using noise as a defense,
 3. optionally restored with an HGD denoiser.
+4. using different IoU metrics and noise types as for adversarial detection
 
 The goal is to measure how robust detection is under these conditions using IoU-based comparisons, recall, and precision.
 
@@ -20,6 +21,7 @@ The goal is to measure how robust detection is under these conditions using IoU-
 	- `noise_then_denoise`
 - Compares detections with IoU metrics (`standard`, `giou`, `diou`, `ciou`).
 - Reports recall and precision (with optional IoU margin tolerance).
+- Compare attack detection rates using sweeping threshold 
 
 ## Project Structure
 
@@ -31,7 +33,7 @@ The goal is to measure how robust detection is under these conditions using IoU-
 - `notebooks/` - experiments and analysis
 	- `hgd_training.ipynb` - train denoiser model
 	- `recall_precision.ipynb` - main recall/precision evaluation
-	- `batch_test.ipynb` - plotting and batch analysis utilities
+	- `batch_test.ipynb` - plotting and batch analysis utilities for attack detection rates 
 - `leftImg8bit/` - dataset images (train/val/test)
 - `results/` - generated plots and output artifacts
 
