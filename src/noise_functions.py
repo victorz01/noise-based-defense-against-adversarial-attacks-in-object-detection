@@ -1,5 +1,6 @@
 import torch
 
+
 def add_gaussian_noise(image, mean, std):
     std = std/255.0
     noise = torch.randn_like(image) * std + mean
@@ -24,6 +25,7 @@ def add_poisson_noise(image, scale):
     noisy_image = torch.poisson(scaled_image) / (255.0 * scale)
     return torch.clamp(noisy_image, 0, 1)
 
+#Main function to add noise based on the type of noise and its parameters 
 def add_noise(noise_type, original_image, **noise_params):
     if noise_type == "gaussian":
         return add_gaussian_noise(image=original_image, 
